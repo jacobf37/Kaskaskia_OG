@@ -75,6 +75,7 @@ plot_summ %>%
   geom_point(shape = 19, size = 3) +
   scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
   scale_y_continuous(limits = c(0,50)) +
+  ylab(expression(Basal~Area~(M^2~ha^-1))) +
   theme_classic()
 ```
 
@@ -94,6 +95,7 @@ plot_summ %>%
   geom_point(shape = 19, size = 3) +
   scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
   scale_y_continuous(limits = c(0,1000)) +
+  ylab(expression(Stem~Density~(Stems~ha^-1))) +
   theme_classic()
 ```
 
@@ -110,6 +112,8 @@ plot_summ %>% select(PLOT, starts_with('BA_')) %>%
     geom_point(shape = 21, size = 3) +
     scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
     scale_y_continuous(limits = c(0,55)) +
+    xlab('Year') +
+    ylab(expression(Basal~Area~(M^2~ha^-1))) +
     theme_classic()
 ```
 
@@ -126,6 +130,8 @@ plot_summ %>% select(PLOT, starts_with('TPH_')) %>%
     geom_point(shape = 19, size = 3) +
     scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
     scale_y_continuous(limits = c(0, 1200)) +
+    xlab('Year') +
+    ylab(expression(Stem~Density~(Stems~ha^-1))) +
     theme_classic()
 ```
 
