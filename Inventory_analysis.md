@@ -125,6 +125,7 @@ plot_summ %>% select(PLOT, starts_with('TPH_')) %>%
     geom_line(linewidth = 1) +
     geom_point(shape = 19, size = 3) +
     scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
+    scale_y_continuous(limits = c(0, 1200)) +
     theme_classic()
 ```
 
