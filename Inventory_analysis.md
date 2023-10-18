@@ -5,13 +5,10 @@ output:
     keep_md: true
 ---
 
-```{r include=FALSE}
-library(tidyverse)
-library(readxl)
-library(rFIA)
-```
 
-```{r message=FALSE, warning=FALSE}
+
+
+```r
 tb <- read_xlsx('./Data/2023 kaskaskia woods.xlsx', sheet = 'Sheet2', range = 'A1:O427') %>% 
   select(PLOT = `Plot #`, STAT_2012 = `2012 Status`, DBH_2012 = `2012 DBH (cm)`, 
          STAT_2023 = `2023 Status`, DBH_2023 = `2023 DBH (cm)`) %>% 
@@ -32,7 +29,8 @@ tb_hist <- read_xls('./Data/Historical Data - KEFAllPlots.xls', sheet = 'KEFPLot
 ```
 
 
-```{r}
+
+```r
 plot_summ <- tb_hist %>% group_by(PLOT) %>% 
   summarise(BA_1935 = sum((DBH35 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
             BA_1940 = sum((DBH40 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
@@ -61,11 +59,11 @@ plot_summ <- tb_hist %>% group_by(PLOT) %>%
                 TPH_2023 = sum(TPH_2023, na.rm = T)),
       by = 'PLOT'
       )
-
 ```
 
 Mean basal area
-```{r}
+
+```r
 plot_summ %>% 
   ungroup() %>% 
   select(-PLOT) %>% colMeans() %>% data.frame(Value = .) %>% 
@@ -80,8 +78,11 @@ plot_summ %>%
   theme_classic()
 ```
 
+![](Inventory_analysis_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+
 Mean stem density
-```{r}
+
+```r
 plot_summ %>% 
   ungroup() %>% 
   select(-PLOT) %>% colMeans() %>% data.frame(Value = .) %>% 
@@ -96,8 +97,11 @@ plot_summ %>%
   theme_classic()
 ```
 
+![](Inventory_analysis_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+
 Plot basal area
-```{r}
+
+```r
 plot_summ %>% select(PLOT, starts_with('BA_')) %>% 
   pivot_longer(!PLOT, names_to = 'YEAR', values_to = 'BAH') %>% 
   mutate(YEAR = as.integer(str_remove(YEAR, pattern = 'BA_'))) %>% 
@@ -109,8 +113,11 @@ plot_summ %>% select(PLOT, starts_with('BA_')) %>%
     theme_classic()
 ```
 
+![](Inventory_analysis_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+
 Plot stem density
-```{r}
+
+```r
 plot_summ %>% select(PLOT, starts_with('TPH_')) %>% 
   pivot_longer(!PLOT, names_to = 'YEAR', values_to = 'TPH') %>% 
   mutate(YEAR = as.integer(str_remove(YEAR, pattern = 'TPH_'))) %>% 
@@ -120,4 +127,6 @@ plot_summ %>% select(PLOT, starts_with('TPH_')) %>%
     scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
     theme_classic()
 ```
+
+![](Inventory_analysis_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
 
