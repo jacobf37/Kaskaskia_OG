@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Kaskaskia Woods"
 output:
   html_document:
     keep_md: true
@@ -9,122 +9,430 @@ output:
 library(tidyverse)
 library(readxl)
 library(rFIA)
+library(randomcoloR)
+library(pastecs)
+library(plotly)
+
+colPal <- c("#89C5DA", "#DA5724", "#74D944", "#CE50CA", "#3F4921", "#C0717C", "#CBD588", "#5F7FC7", 
+"#673770", "#D3D93E", "#38333E", "#508578", "#D7C1B1", "#689030", "#AD6F3B", "#CD9BCD", 
+"#D14285", "#6DDE88", "#652926", "#7FDCC0", "#C84248", "#8569D5", "#5E738F", "#D1A33D", 
+"#8A7C64", "#599861"
+)
+
+spRecode <- c('AMB' = 'American beech',
+'AME' = 'American elm',
+'BAS' = 'basswood',
+'BLB' = 'blue beech',
+'BLC' = 'black cherry',
+'BLG' = 'black gum',
+'BLO' = 'black oak',
+'BLW' = 'black walnut',
+'ERC' = 'eastern redcedar',
+'FLD' = 'flowering dogwood',
+'IRO' = 'ironwood',
+'MOH' = 'mockernut hickory',
+'NRO' = 'northern red oak',
+'PAP' = 'paw paw',
+'PER' = 'persimmon',
+'PIH' = 'pignut hickory',
+'REB' = 'eastern redbud',
+'REE' = 'red elm',
+'SAS' = 'sassafras',
+'SCO' = 'scarlet oak',
+'SER' = 'serviceberry',
+'SHH' = 'shagbark hickory',
+'SUM' = 'sugar maple',
+'WHA' = 'white ash',
+'WHO' = 'white oak',
+'YEP' = 'yellow-poplar',
+'ZRM' = 'red mulberry')
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r include=FALSE}
+## Summarizes data.
+## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   groupvars: a vector containing names of columns that contain grouping variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+
+  # New version of length which can handle NA's: if na.rm==T, don't count them
+  length2 <- function (x, na.rm=FALSE) {
+    if (na.rm) sum(!is.na(x))
+    else       length(x)
+  }
+  
+  # This does the summary. For each group's data frame, return a vector with
+  # N, mean, and sd
+  datac <- plyr::ddply(data, groupvars, .drop=.drop,
+                 .fun = function(xx, col) {
+                   c(N    = length2(xx[[col]], na.rm=na.rm),
+                     mean = mean   (xx[[col]], na.rm=na.rm),
+                     sd   = sd     (xx[[col]], na.rm=na.rm)
+                   )
+                 },
+                 measurevar
+  )
+  
+  # Rename the "mean" column    
+  datac <- plyr::rename(datac, c("mean" = measurevar))
+  
+  datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+  
+  # Confidence interval multiplier for standard error
+  # Calculate t-statistic for confidence interval: 
+  # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+  ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+  datac$ci <- datac$se * ciMult
+  
+  return(datac)
+}
+```
+
+```{r Read tables, message=FALSE, warning=FALSE, include=FALSE}
+sp_tb <- read_xls('./Data/Historical Data - KEFAllPlots.xls', sheet = 'SPEC', range = 'A1:D24') %>%
+  select(SPEC = Species, Species = SPCODE)
+
 tb <- read_xlsx('./Data/2023 kaskaskia woods.xlsx', sheet = 'Sheet2', range = 'A1:O427') %>% 
-  select(PLOT = `Plot #`, STAT_2012 = `2012 Status`, DBH_2012 = `2012 DBH (cm)`, 
-         STAT_2023 = `2023 Status`, DBH_2023 = `2023 DBH (cm)`) %>% 
-  mutate(PLOT = as.factor(PLOT))
+  select(PLOT = `Plot #`, Azimuth, Distance = `Distance (m)`,
+         STAT_2023 = `2023 Status`, DBH_2023 = `2023 DBH (cm)`, Species,
+         TROG = `Old tree # TROG`, TRNN = `New tree # TRNN`, TR12 = `2012 Tag #`, TR23 = `2023 Tag #`) %>% 
+  mutate(TROG = ifelse(is.na(TROG), 0, TROG), TRNN = ifelse(is.na(TRNN), 0, TRNN),
+         TR12 = ifelse(is.na(TR12), 0, TR12), TR23 = ifelse(is.na(TR23), 0, TR23),
+         TAG = str_c(PLOT, TROG, TRNN, TR12, sep = '_')) %>% 
+  select(PLOT, Azimuth, Distance, STAT_2023, DBH_2023, Species, TAG, TR23)
+
+tb_2012 <- read_xlsx('./Data/Kaskaskia Trees 2012.xlsx', sheet = 'Kaskaskia Overstory.xls', range = 'A3:S1379') %>% 
+  select(PLOT = `Plot #`, Azimuth, Distance = `Distance (m)`, STAT_2012 = `2012 Status`, DBH_2012 = `2012 DBH (cm)`, 
+         Species, TROG = `Old tree # TROG`, TRNN = `New tree # TRNN`, TR12 = `2012 Tag #`) %>% 
+    mutate(TROG = ifelse(is.na(TROG), 0, TROG), TRNN = ifelse(is.na(TRNN), 0, TRNN),
+         TR12 = ifelse(is.na(TR12), 0, TR12),
+         TAG = str_c(PLOT, TROG, TRNN, sep = '_')) %>% 
+  select(PLOT, Azimuth, Distance, STAT_2012, DBH_2012, Species, TR12, TAG)
 
 tb_hist <- read_xls('./Data/Historical Data - KEFAllPlots.xls', sheet = 'KEFPLots1to8', range = 'A3:V1324') %>% 
   select(-DBH83...9, -DBH97...10) %>% 
   rename(DBH83 = DBH83...18, DBH97 = DBH97...19) %>% 
-  mutate(PLOT = as.factor(PLOT),
-         TPH_35 = ifelse(DBH35 == 0, 0, 9.88),
-         TPH_40 = ifelse(DBH40 == 0, 0, 9.88),
-         TPH_58 = ifelse(DBH58 == 0, 0, 9.88),
-         TPH_64 = ifelse(DBH64 == 0, 0, 9.88),
-         TPH_73 = ifelse(DBH73 == 0, 0, 9.88),
-         TPH_78 = ifelse(DBH78 == 0, 0, 9.88),
-         TPH_83 = ifelse(DBH83 == 0, 0, 9.88),
-         TPH_97 = ifelse(DBH97 == 0, 0, 9.88))
+  mutate(
+         DBH35 = DBH35 * 2.54,
+         DBH40 = DBH40 * 2.54,
+         DBH58 = DBH58 * 2.54,
+         DBH64 = DBH64 * 2.54,
+         DBH73 = DBH73 * 2.54,
+         DBH78 = DBH78 * 2.54,
+         DBH83 = DBH83 * 2.54,
+         DBH97 = DBH97 * 2.54
+  ) %>% 
+  left_join(sp_tb, by = 'SPEC') %>% 
+    mutate(TROG = ifelse(is.na(TROG), 0, TROG), TRNN = ifelse(is.na(TRNN), 0, TRNN),
+         TAG = str_c(PLOT, TROG, TRNN, sep = '_')) %>% 
+  select(PLOT, Azimuth = BEAR, Distance = DIST, DBH_1935 = DBH35, DBH_1940 = DBH40, 
+         DBH_1958 = DBH58, DBH_1964 = DBH64, DBH_1973 = DBH73, DBH_1978 = DBH78, 
+         DBH_1983 = DBH83, DBH_1997 = DBH97, Species, TAG) %>% 
+  mutate(Distance = Distance / 3.28)
+
+
+  
 ```
 
 
-```{r}
-plot_summ <- tb_hist %>% group_by(PLOT) %>% 
-  summarise(BA_1935 = sum((DBH35 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1940 = sum((DBH40 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1958 = sum((DBH58 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1964 = sum((DBH64 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1973 = sum((DBH73 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1978 = sum((DBH78 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1983 = sum((DBH83 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            BA_1997 = sum((DBH97 * 2.54)^2 * 0.00007854 * 9.88, na.rm = T),
-            TPH_1935 = sum(TPH_35, na.rm = T),
-            TPH_1940 = sum(TPH_40, na.rm = T),
-            TPH_1958 = sum(TPH_58, na.rm = T),
-            TPH_1964 = sum(TPH_64, na.rm = T),
-            TPH_1973 = sum(TPH_73, na.rm = T),
-            TPH_1978 = sum(TPH_78, na.rm = T),
-            TPH_1983 = sum(TPH_83, na.rm = T),
-            TPH_1997 = sum(TPH_97, na.rm = T)) %>% 
+```{r include=FALSE}
+plot_summ <- tb_hist %>% 
+  mutate(TPH_1935 = ifelse(DBH_1935 == 0, 0, 9.88),
+         TPH_1940 = ifelse(DBH_1940 == 0, 0, 9.88),
+         TPH_1958 = ifelse(DBH_1958 == 0, 0, 9.88),
+         TPH_1964 = ifelse(DBH_1964 == 0, 0, 9.88),
+         TPH_1973 = ifelse(DBH_1973 == 0, 0, 9.88),
+         TPH_1978 = ifelse(DBH_1978 == 0, 0, 9.88),
+         TPH_1983 = ifelse(DBH_1983 == 0, 0, 9.88),
+         TPH_1997 = ifelse(DBH_1997 == 0, 0, 9.88)) %>% 
+  group_by(PLOT) %>% 
+  summarise(BA_1935 = sum((DBH_1935)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1940 = sum((DBH_1940)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1958 = sum((DBH_1958)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1964 = sum((DBH_1964)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1973 = sum((DBH_1973)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1978 = sum((DBH_1978)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1983 = sum((DBH_1983)^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1997 = sum((DBH_1997)^2 * 0.00007854 * 9.88, na.rm = T),
+            TPH_1935 = sum(TPH_1935, na.rm = T),
+            TPH_1940 = sum(TPH_1940, na.rm = T),
+            TPH_1958 = sum(TPH_1958, na.rm = T),
+            TPH_1964 = sum(TPH_1964, na.rm = T),
+            TPH_1973 = sum(TPH_1973, na.rm = T),
+            TPH_1978 = sum(TPH_1978, na.rm = T),
+            TPH_1983 = sum(TPH_1983, na.rm = T),
+            TPH_1997 = sum(TPH_1997, na.rm = T)) %>% 
+  left_join(tb_2012 %>% filter(STAT_2012 == 'LV') %>% 
+              mutate(TPH_2012 = 9.88) %>% 
+              group_by(PLOT) %>% 
+              summarise(BA_2012 = sum((DBH_2012)^2 * 0.00007854 * 9.88, na.rm = T),
+                        TPH_2012 = sum(TPH_2012, na.rm = T)),
+            by = 'PLOT'
+            ) %>% 
   left_join(tb %>% 
-      mutate(DBH_2023 = ifelse(STAT_2023 == 'LV', DBH_2023, 0.0),
-             TPH_2023 = ifelse(STAT_2023 == 'LV', 9.88, 0.0),
-             TPH_2012 = 9.88) %>% 
-      group_by(PLOT) %>% 
-      summarise(BA_2012 = sum((DBH_2012)^2 * 0.00007854 * 9.88, na.rm = T),
-                BA_2023 = sum((DBH_2023)^2 * 0.00007854 * 9.88, na.rm = T),
-                TPH_2012 = sum(TPH_2012, na.rm = T),
-                TPH_2023 = sum(TPH_2023, na.rm = T)),
-      by = 'PLOT'
+            mutate(DBH_2023 = ifelse(STAT_2023 == 'LV', DBH_2023, 0.0),
+                   TPH_2023 = ifelse(STAT_2023 == 'LV', 9.88, 0.0),
+                   TPH_2012 = 9.88) %>% 
+            group_by(PLOT) %>% 
+            summarise(BA_2023 = sum((DBH_2023)^2 * 0.00007854 * 9.88, na.rm = T),
+                      TPH_2023 = sum(TPH_2023, na.rm = T)),
+            by = 'PLOT'
+      )
+
+saveRDS(plot_summ, file = './Data/plot_summ.rds')
+plot_summ_stat <- plot_summ %>% ungroup() %>% pivot_longer(cols = BA_1935:TPH_2023, names_to = 'Metric', values_to = 'value') %>% 
+  summarySE(data = ., measurevar = 'value', groupvars = 'Metric') %>% 
+  mutate(Year = as.integer(str_remove(Metric, 'BA_|TPH_')))
+saveRDS(object = plot_summ_stat, file = './Data/plot_summ_stat.rds')
+
+```
+
+
+### Stand mean basal area
+```{r Stand basal area, echo=FALSE}
+
+plot_ly(data = plot_summ_stat %>% filter(str_starts(Metric, 'BA_')),
+                   x = ~Year, y = ~value, text = ~Year, customdata = ~se,
+                   type = 'scatter', mode = 'lines+markers',
+                   error_y = ~list(array = se, color = '#000000'),
+                  hovertemplate = paste("<b>%{text}</b><br>",
+                    "%{y:.1f} \u00B1 %{customdata:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                    "<extra></extra>")) %>% 
+            layout( 
+                  xaxis = list(title = 'Year', showgrid = F, showline = T),
+                  yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,50))
+                  )
+
+
+
+```
+
+### Stand mean stem density
+```{r Stand stem density, echo=FALSE}
+
+plot_ly(data = plot_summ_stat %>% filter(str_starts(Metric, 'TPH_')),
+                   x = ~Year, y = ~value, text = ~Year, customdata = ~se,
+                   type = 'scatter', mode = 'lines+markers',
+                   error_y = ~list(array = se, color = '#000000'),
+                   hovertemplate = paste("<b>%{text}</b><br>",
+                                        "%{y:.1f} \u00B1 %{customdata:.1f} stems ha<sup>-1</sup>",
+                                        "<extra></extra>")) %>% 
+            layout(
+                  xaxis = list(title = 'Year', showgrid = F, showline = T),
+                  yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000))
+                  )
+
+
+```
+
+### Plot basal area
+```{r Plot basal area, echo=FALSE}
+plot_summ %>% select(PLOT, starts_with('BA_')) %>%
+  mutate(PLOT = as.factor(PLOT)) %>% 
+  pivot_longer(!PLOT, names_to = 'YEAR', values_to = 'BAH') %>% 
+  mutate(YEAR = as.integer(str_remove(YEAR, pattern = 'BA_'))) %>% 
+  plot_ly(x = ~YEAR, y = ~BAH, color = ~PLOT, text = ~PLOT, type = 'scatter', mode = 'lines+markers',
+          hovertemplate = paste("<b>Plot %{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+  layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,55)),
+      legend = list(x = 0.875, y = 0.05, title = list(text='Plot'))
       )
 
 ```
 
-Mean basal area
-```{r}
-plot_summ %>% 
-  ungroup() %>% 
-  select(-PLOT) %>% colMeans() %>% data.frame(Value = .) %>% 
-  mutate(Metric = rownames(.)) %>% 
-  filter(str_starts(Metric, 'BA_')) %>% 
-  mutate(Year = as.integer(str_remove(Metric, pattern = 'BA_'))) %>% 
-  ggplot(aes(x = Year, y = Value, group = 1)) +
-  geom_line(linewidth = 1) +
-  geom_point(shape = 19, size = 3) +
-  scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
-  scale_y_continuous(limits = c(0,50)) +
-  ylab(expression(Basal~Area~(M^2~ha^-1))) +
-  theme_classic()
-```
-
-Mean stem density
-```{r}
-plot_summ %>% 
-  ungroup() %>% 
-  select(-PLOT) %>% colMeans() %>% data.frame(Value = .) %>% 
-  mutate(Metric = rownames(.)) %>% 
-  filter(str_starts(Metric, 'TPH_')) %>% 
-  mutate(Year = as.integer(str_remove(Metric, pattern = 'TPH_'))) %>% 
-  ggplot(aes(x = Year, y = Value, group = 1)) +
-  geom_line(linewidth = 1) +
-  geom_point(shape = 19, size = 3) +
-  scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
-  scale_y_continuous(limits = c(0,1000)) +
-  ylab(expression(Stem~Density~(Stems~ha^-1))) +
-  theme_classic()
-```
-
-Plot basal area
-```{r}
-plot_summ %>% select(PLOT, starts_with('BA_')) %>% 
-  pivot_longer(!PLOT, names_to = 'YEAR', values_to = 'BAH') %>% 
-  mutate(YEAR = as.integer(str_remove(YEAR, pattern = 'BA_'))) %>% 
-  ggplot(aes(x = YEAR, y = BAH, group = PLOT, color = PLOT)) +
-    geom_line(linewidth = 1) +
-    geom_point(shape = 21, size = 3) +
-    scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
-    scale_y_continuous(limits = c(0,55)) +
-    xlab('Year') +
-    ylab(expression(Basal~Area~(M^2~ha^-1))) +
-    theme_classic()
-```
-
-Plot stem density
-```{r}
+### Plot stem density
+```{r Plot stem density, echo=FALSE}
 plot_summ %>% select(PLOT, starts_with('TPH_')) %>% 
+  mutate(PLOT = as.factor(PLOT)) %>%
   pivot_longer(!PLOT, names_to = 'YEAR', values_to = 'TPH') %>% 
   mutate(YEAR = as.integer(str_remove(YEAR, pattern = 'TPH_'))) %>% 
-  ggplot(aes(x = YEAR, y = TPH, group = PLOT, color = PLOT)) +
-    geom_line(linewidth = 1) +
-    geom_point(shape = 19, size = 3) +
-    scale_x_continuous(limits = c(1935, 2025), breaks = seq(from = 1935, to = 2025, by = 10)) +
-    scale_y_continuous(limits = c(0, 1200)) +
-    xlab('Year') +
-    ylab(expression(Stem~Density~(Stems~ha^-1))) +
-    theme_classic()
+  plot_ly(x = ~YEAR, y = ~TPH, color = ~PLOT, text = ~PLOT, type = 'scatter', mode = 'lines+markers',
+                    hovertemplate = paste("<b>Plot %{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} stems ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+  layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1200)),
+      legend = list(x = 0.05, y = 0.05, title = list(text='Plot'))
+      )
+```
+
+
+```{r include=FALSE}
+comp_tb <- tb_2012 %>% full_join(tb_hist, by = 'TAG') %>% 
+  mutate(TAG = str_c(TAG, TR12, sep = '_')) %>% 
+  full_join(tb, by = 'TAG') %>% 
+  mutate(TR23 = ifelse(is.na(TR23), 0, TR23),
+         TAG = str_c(TAG, TR23, sep = '_'),
+         Azimuth = pmax(Azimuth, Azimuth.x, Azimuth.y, na.rm = T),
+         Distance = pmax(Distance, Distance.x, Distance.y, na.rm = T),
+         PLOT = pmax(PLOT, PLOT.x, PLOT.y, na.rm = T),
+         Species = ifelse(is.na(Species), Species.x, Species),
+         DBH_2012 = ifelse(is.na(DBH_2012), 0, DBH_2012),
+         DBH_2023 = ifelse(is.na(DBH_2023), 0, DBH_2023)
+         ) %>% 
+  select(PLOT, TAG, Azimuth, Distance, Species, 
+         DBH_1935,
+         DBH_1940,
+         DBH_1958,
+         DBH_1964,
+         DBH_1973,
+         DBH_1978,
+         DBH_1983,
+         DBH_1997,
+         DBH_2012,
+         DBH_2023) %>% 
+    mutate(
+         # TPH_1935 = ifelse(DBH_1935 == 0, 0, 9.88),
+         # TPH_1940 = ifelse(DBH_1940 == 0, 0, 9.88),
+         # TPH_1958 = ifelse(DBH_1958 == 0, 0, 9.88),
+         # TPH_1964 = ifelse(DBH_1964 == 0, 0, 9.88),
+         # TPH_1973 = ifelse(DBH_1973 == 0, 0, 9.88),
+         # TPH_1978 = ifelse(DBH_1978 == 0, 0, 9.88),
+         # TPH_1983 = ifelse(DBH_1983 == 0, 0, 9.88),
+         # TPH_1997 = ifelse(DBH_1997 == 0, 0, 9.88),
+         # TPH_2012 = ifelse(DBH_2012 == 0, 0, 9.88),
+         # TPH_2023 = ifelse(DBH_2023 == 0, 0, 9.88),
+         TPH_1935 = ifelse(DBH_1935 == 0, 0, 1.2355),
+         TPH_1940 = ifelse(DBH_1940 == 0, 0, 1.2355),
+         TPH_1958 = ifelse(DBH_1958 == 0, 0, 1.2355),
+         TPH_1964 = ifelse(DBH_1964 == 0, 0, 1.2355),
+         TPH_1973 = ifelse(DBH_1973 == 0, 0, 1.2355),
+         TPH_1978 = ifelse(DBH_1978 == 0, 0, 1.2355),
+         TPH_1983 = ifelse(DBH_1983 == 0, 0, 1.2355),
+         TPH_1997 = ifelse(DBH_1997 == 0, 0, 1.2355),
+         TPH_2012 = ifelse(DBH_2012 == 0, 0, 1.2355),
+         TPH_2023 = ifelse(DBH_2023 == 0, 0, 1.2355),
+         BA_1935 = (DBH_1935)^2 * 0.00007854 * TPH_1935,
+         BA_1940 = (DBH_1940)^2 * 0.00007854 * TPH_1940,
+         BA_1958 = (DBH_1958)^2 * 0.00007854 * TPH_1958,
+         BA_1964 = (DBH_1964)^2 * 0.00007854 * TPH_1964,
+         BA_1973 = (DBH_1973)^2 * 0.00007854 * TPH_1973,
+         BA_1978 = (DBH_1978)^2 * 0.00007854 * TPH_1978,
+         BA_1983 = (DBH_1983)^2 * 0.00007854 * TPH_1983,
+         BA_1997 = (DBH_1997)^2 * 0.00007854 * TPH_1997,
+         BA_2012 = (DBH_2012)^2 * 0.00007854 * TPH_2012,
+         BA_2023 = (DBH_2023)^2 * 0.00007854 * TPH_2023) %>% 
+  filter(!is.na(Species)) %>% 
+  mutate(Species = ifelse(Species %in% c('24', '25', '26', '27'), 'Other', Species),
+         Species = ifelse(Species == 'RMU', 'ZRM', Species),
+         Species = recode(Species, !!!as.list(spRecode)))
+
+
+comp_sp_summ <- comp_tb %>% group_by(PLOT, Species) %>% 
+  summarise(BA_1935 = sum(DBH_1935^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1940 = sum(DBH_1940^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1958 = sum(DBH_1958^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1964 = sum(DBH_1964^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1973 = sum(DBH_1973^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1978 = sum(DBH_1978^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1983 = sum(DBH_1983^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_1997 = sum(DBH_1997^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_2012 = sum(DBH_2012^2 * 0.00007854 * 9.88, na.rm = T),
+            BA_2023 = sum(DBH_2023^2 * 0.00007854 * 9.88, na.rm = T),
+            TPH_1935 = sum(TPH_1935, na.rm = T),
+            TPH_1940 = sum(TPH_1940, na.rm = T),
+            TPH_1958 = sum(TPH_1958, na.rm = T),
+            TPH_1964 = sum(TPH_1964, na.rm = T),
+            TPH_1973 = sum(TPH_1973, na.rm = T),
+            TPH_1978 = sum(TPH_1978, na.rm = T),
+            TPH_1983 = sum(TPH_1983, na.rm = T),
+            TPH_1997 = sum(TPH_1997, na.rm = T),
+            TPH_2012 = sum(TPH_2012, na.rm = T),
+            TPH_2023 = sum(TPH_2023, na.rm = T)) %>% 
+  mutate(
+            QMD_1935 = sqrt((BA_1935 / TPH_1935) / 0.00007854),
+            QMD_1940 = sqrt((BA_1940 / TPH_1940) / 0.00007854),
+            QMD_1958 = sqrt((BA_1958 / TPH_1958) / 0.00007854),
+            QMD_1964 = sqrt((BA_1964 / TPH_1964) / 0.00007854),
+            QMD_1973 = sqrt((BA_1973 / TPH_1973) / 0.00007854),
+            QMD_1978 = sqrt((BA_1978 / TPH_1978) / 0.00007854),
+            QMD_1983 = sqrt((BA_1983 / TPH_1983) / 0.00007854),
+            QMD_1997 = sqrt((BA_1997 / TPH_1997) / 0.00007854),
+            QMD_2012 = sqrt((BA_2012 / TPH_2012) / 0.00007854),
+            QMD_2023 = sqrt((BA_2023 / TPH_2023) / 0.00007854)) %>% 
+  ungroup()
+
+```
+
+### Species group basal area
+```{r Stand basal area plot, echo=FALSE}
+
+comp_tb %>% 
+    mutate(Species = as.factor(case_match(Species,
+             'yellow-poplar' ~ 'yellow-poplar',
+             'white oak' ~ 'white oak',
+             'sugar maple' ~ 'sugar maple',
+             'scarlet oak' ~ 'scarlet oak',
+             'pignut hickory' ~ 'hickory',
+             'shagbark hickory' ~ 'hickory',
+             'mockernut hickory' ~'hickory',
+             'northern red oak' ~ 'northern red oak',
+             'black oak' ~ 'black oak',
+             .default = 'other'
+             ))) %>% 
+  mutate(Species = fct_relevel(Species, 'other', 'yellow-poplar', 'sugar maple', 
+                               'hickory', 'white oak', 'scarlet oak', 'northern red oak', 'black oak')) %>% 
+  group_by(Species) %>% 
+  summarise(across(TPH_1935:BA_2023, ~ sum(.x, na.rm = T))) %>% 
+  select(Species, starts_with('BA_')) %>% 
+  pivot_longer(!c(Species), names_to = 'Year', values_to = 'BAH') %>% 
+  mutate(Year = as.integer(str_remove_all(Year, 'BA_'))) %>% 
+  plot_ly(x = ~Year, y = ~BAH, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,55)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+
+```
+
+### Species group stem density
+```{r Stand stem density plot, echo=FALSE}
+comp_tb %>% 
+      mutate(Species = as.factor(case_match(Species,
+             'yellow-poplar' ~ 'yellow-poplar',
+             'white oak' ~ 'white oak',
+             'sugar maple' ~ 'sugar maple',
+             'scarlet oak' ~ 'scarlet oak',
+             'pignut hickory' ~ 'hickory',
+             'shagbark hickory' ~ 'hickory',
+             'mockernut hickory' ~'hickory',
+             'northern red oak' ~ 'northern red oak',
+             'black oak' ~ 'black oak',
+             .default = 'other'
+             ))) %>% 
+  mutate(Species = fct_relevel(Species, 'other', 'yellow-poplar', 'sugar maple', 
+                               'hickory', 'white oak', 'scarlet oak', 'northern red oak', 'black oak')) %>% 
+  group_by(Species) %>% 
+  summarise(across(TPH_1935:BA_2023, ~ sum(.x, na.rm = T))) %>% 
+  select(Species, starts_with('TPH_')) %>% 
+  pivot_longer(!c(Species), names_to = 'Year', values_to = 'TPH') %>% 
+  mutate(Year = as.integer(str_remove_all(Year, 'TPH_'))) %>% 
+  plot_ly(x = ~Year, y = ~TPH, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
 ```
 
