@@ -339,16 +339,16 @@ comp_sp_summ <- comp_tb %>% group_by(PLOT, Species) %>%
             BA_1997 = sum(DBH_1997^2 * 0.00007854 * 9.88, na.rm = T),
             BA_2012 = sum(DBH_2012^2 * 0.00007854 * 9.88, na.rm = T),
             BA_2023 = sum(DBH_2023^2 * 0.00007854 * 9.88, na.rm = T),
-            TPH_1935 = sum(TPH_1935, na.rm = T),
-            TPH_1940 = sum(TPH_1940, na.rm = T),
-            TPH_1958 = sum(TPH_1958, na.rm = T),
-            TPH_1964 = sum(TPH_1964, na.rm = T),
-            TPH_1973 = sum(TPH_1973, na.rm = T),
-            TPH_1978 = sum(TPH_1978, na.rm = T),
-            TPH_1983 = sum(TPH_1983, na.rm = T),
-            TPH_1997 = sum(TPH_1997, na.rm = T),
-            TPH_2012 = sum(TPH_2012, na.rm = T),
-            TPH_2023 = sum(TPH_2023, na.rm = T)) %>% 
+            TPH_1935 = sum(TPH_1935 * 8, na.rm = T),
+            TPH_1940 = sum(TPH_1940 * 8, na.rm = T),
+            TPH_1958 = sum(TPH_1958 * 8, na.rm = T),
+            TPH_1964 = sum(TPH_1964 * 8, na.rm = T),
+            TPH_1973 = sum(TPH_1973 * 8, na.rm = T),
+            TPH_1978 = sum(TPH_1978 * 8, na.rm = T),
+            TPH_1983 = sum(TPH_1983 * 8, na.rm = T),
+            TPH_1997 = sum(TPH_1997 * 8, na.rm = T),
+            TPH_2012 = sum(TPH_2012 * 8, na.rm = T),
+            TPH_2023 = sum(TPH_2023 * 8, na.rm = T)) %>% 
   mutate(
             QMD_1935 = sqrt((BA_1935 / TPH_1935) / 0.00007854),
             QMD_1940 = sqrt((BA_1940 / TPH_1940) / 0.00007854),
@@ -436,3 +436,259 @@ comp_tb %>%
       )
 ```
 
+```{r Species basal area (plot-level), include=FALSE}
+plot_sp_summ <- comp_sp_summ %>% 
+    mutate(Species = as.factor(case_match(Species,
+             'yellow-poplar' ~ 'yellow-poplar',
+             'white oak' ~ 'white oak',
+             'sugar maple' ~ 'sugar maple',
+             'scarlet oak' ~ 'scarlet oak',
+             'pignut hickory' ~ 'hickory',
+             'shagbark hickory' ~ 'hickory',
+             'mockernut hickory' ~'hickory',
+             'northern red oak' ~ 'northern red oak',
+             'black oak' ~ 'black oak',
+             .default = 'other'
+             ))) %>% 
+  mutate(Species = fct_relevel(Species, 'other', 'yellow-poplar', 'sugar maple', 
+                               'hickory', 'white oak', 'scarlet oak', 'northern red oak', 'black oak')) %>% 
+  group_by(PLOT, Species) %>% 
+  summarise(across(BA_1935:TPH_2023, ~ sum(.x, na.rm = T))) %>% 
+  ungroup() %>% 
+  #select(Species, starts_with('BA_')) %>% 
+  pivot_longer(!c(PLOT, Species), names_to = 'Metric', values_to = 'Value') %>% 
+  mutate(Year = as.integer(str_split_i(Metric, '_', 2)),
+         Metric = str_split_i(Metric, '_', 1))  
+
+```
+### Plot 1
+```{r Plot 1, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 1, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 1, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 2
+```{r Plot 2, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 2, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 2, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 3
+```{r Plot 3, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 3, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 3, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 4
+```{r Plot 4, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 4, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 4, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 5
+```{r Plot 5, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 5, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 5, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 6
+```{r Plot 6, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 6, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 6, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 7
+```{r Plot 7, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 7, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 7, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
+
+### Plot 8
+```{r Plot 8, echo=FALSE}
+plot_sp_summ %>% filter(PLOT == 8, Metric == 'BA') %>%   
+plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+          hovertemplate = paste("<b>%{text}</b><br>",
+                                "%{xaxis.title.text}: %{x}<br>",
+                                "%{y:.1f} m<sup>2</sup> ha<sup>-1</sup>",
+                                "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Basal Area (m<sup>2</sup> ha<sup>-1</sup>)', showgrid = F, showline = T),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      ) 
+
+plot_sp_summ %>% filter(PLOT == 8, Metric == 'TPH') %>%
+  plot_ly(x = ~Year, y = ~Value, color = ~Species, text = ~Species,
+          type = 'scatter', mode = 'line', stackgroup = 'one',
+                    hovertemplate = paste("<b>%{text}</b><br>",
+                      "%{xaxis.title.text}: %{x}<br>",
+                      "%{y:.1f} trees ha<sup>-1</sup>",
+                      "<extra></extra>")) %>% 
+    layout( 
+      xaxis = list(title = 'Year', showgrid = F, showline = T),
+      yaxis = list(title = 'Stem Density (trees ha<sup>-1</sup>)', showgrid = F, showline = T, range = c(0,1000)),
+      legend = list(title = list(text='Species'), orientation = 'h', y = -0.2)
+      )
+```
